@@ -11,7 +11,6 @@ const CreateAdmin = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    password: '',
     school_id: selectedSchoolId || '',
   });
   const [loading, setLoading] = useState(false);
@@ -59,15 +58,15 @@ const CreateAdmin = () => {
     }
 
     try {
-      await adminsAPI.create(formData.school_id, formData);
-      setSuccess('School Admin created successfully!');
-      setFormData({ name: '', email: '', password: '', school_id: selectedSchoolId || '' });
+      await adminsAPI.invite(formData);
+      setSuccess(`Admin invitation sent to ${formData.email}! The admin will receive an email to set their password.`);
+      setFormData({ name: '', email: '', school_id: selectedSchoolId || '' });
       
       setTimeout(() => {
         navigate('/dashboard/admins');
-      }, 1500);
+      }, 3000);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create admin. Please try again.');
+      setError(err.response?.data?.detail || 'Failed to invite admin. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -75,7 +74,10 @@ const CreateAdmin = () => {
 
   return (
     <div className="bg-white rounded-lg shadow p-6 max-w-2xl mx-auto">
-      <h2 className="text-2xl font-semibold text-gray-800 mb-6">Create School Admin</h2>
+      <h2 className="text-2xl font-semibold text-gray-800 mb-6">Invite School Admin</h2>
+      <p className="text-sm text-gray-600 mb-6">
+        Invite an admin by email. They will receive a secure link to set their own password.
+      </p>
 
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -154,25 +156,6 @@ const CreateAdmin = () => {
           />
         </div>
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-            Password <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            minLength="6"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-            placeholder="Enter password (min 6 characters)"
-          />
-          <p className="mt-1 text-sm text-gray-500">
-            Password should be at least 6 characters long
-          </p>
-        </div>
 
         <div className="flex space-x-4">
           <button
@@ -180,11 +163,11 @@ const CreateAdmin = () => {
             disabled={loading || !formData.school_id}
             className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Creating...' : 'Create Admin'}
+            {loading ? 'Sending Invitation...' : 'Send Invitation'}
           </button>
           <button
             type="button"
-            onClick={() => setFormData({ name: '', email: '', password: '', school_id: selectedSchoolId || '' })}
+            onClick={() => setFormData({ name: '', email: '', school_id: selectedSchoolId || '' })}
             className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
           >
             Clear

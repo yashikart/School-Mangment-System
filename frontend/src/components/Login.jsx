@@ -33,7 +33,7 @@ const Login = () => {
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
             School Management System
           </h1>
-          <p className="text-gray-600">Super Admin Login</p>
+          <p className="text-gray-600">Login to your account</p>
         </div>
 
         {error && (
@@ -83,7 +83,7 @@ const Login = () => {
         </form>
 
         <div className="mt-6 text-center text-sm text-gray-600">
-          <p>Super Admin credentials are set up during initial backend configuration.</p>
+          <p>Login with your email and password. All user roles can login here.</p>
         </div>
       </div>
     </div>

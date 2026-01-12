@@ -8,14 +8,57 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
-    { id: 'schools', label: 'Schools', icon: '🏫', path: '/dashboard/schools' },
-    { id: 'create-school', label: 'Create School', icon: '➕', path: '/dashboard/create-school' },
-    { id: 'admins', label: 'Admins', icon: '👥', path: '/dashboard/admins' },
-    { id: 'create-admin', label: 'Create Admin', icon: '➕', path: '/dashboard/create-admin' },
-    { id: 'users', label: 'All Users', icon: '👤', path: '/dashboard/users' },
-  ];
+  // Role-based menu items
+  const getMenuItems = () => {
+    const role = user?.role;
+    
+    if (role === 'SUPER_ADMIN') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
+        { id: 'schools', label: 'Schools', icon: '🏫', path: '/dashboard/schools' },
+        { id: 'create-school', label: 'Create School', icon: '➕', path: '/dashboard/create-school' },
+        { id: 'admins', label: 'Admins', icon: '👥', path: '/dashboard/admins' },
+        { id: 'create-admin', label: 'Create Admin', icon: '➕', path: '/dashboard/create-admin' },
+        { id: 'users', label: 'All Users', icon: '👤', path: '/dashboard/users' },
+      ];
+    } else if (role === 'ADMIN') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
+        { id: 'school', label: 'My School', icon: '🏫', path: '/dashboard/school' },
+        { id: 'teachers', label: 'Teachers', icon: '👨‍🏫', path: '/dashboard/teachers' },
+        { id: 'students', label: 'Students', icon: '👨‍🎓', path: '/dashboard/students' },
+        { id: 'parents', label: 'Parents', icon: '👨‍👩‍👧', path: '/dashboard/parents' },
+      ];
+    } else if (role === 'TEACHER') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
+        { id: 'classes', label: 'My Classes', icon: '📚', path: '/dashboard/classes' },
+        { id: 'students', label: 'Students', icon: '👨‍🎓', path: '/dashboard/students' },
+        { id: 'attendance', label: 'Attendance', icon: '✅', path: '/dashboard/attendance' },
+      ];
+    } else if (role === 'PARENT') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
+        { id: 'children', label: 'My Children', icon: '👨‍👩‍👧', path: '/dashboard/children' },
+        { id: 'grades', label: 'Grades', icon: '📝', path: '/dashboard/grades' },
+        { id: 'attendance', label: 'Attendance', icon: '✅', path: '/dashboard/attendance' },
+      ];
+    } else if (role === 'STUDENT') {
+      return [
+        { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
+        { id: 'grades', label: 'My Grades', icon: '📝', path: '/dashboard/grades' },
+        { id: 'attendance', label: 'Attendance', icon: '✅', path: '/dashboard/attendance' },
+        { id: 'schedule', label: 'Schedule', icon: '📅', path: '/dashboard/schedule' },
+      ];
+    }
+    
+    // Default menu for unknown roles
+    return [
+      { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
+    ];
+  };
+
+  const menuItems = getMenuItems();
 
   const handleNavigation = (path) => {
     navigate(path);
@@ -25,16 +68,38 @@ const Layout = ({ children }) => {
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
-  if (!isSuperAdmin) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
-          <p className="text-gray-600">You don't have permission to access this page.</p>
-        </div>
-      </div>
-    );
-  }
+  const getRoleDisplayName = (role) => {
+    const roleNames = {
+      'SUPER_ADMIN': 'Super Admin',
+      'ADMIN': 'School Admin',
+      'TEACHER': 'Teacher',
+      'PARENT': 'Parent',
+      'STUDENT': 'Student',
+    };
+    return roleNames[role] || role;
+  };
+
+  const getDashboardTitle = (role) => {
+    const titles = {
+      'SUPER_ADMIN': 'Super Admin Dashboard',
+      'ADMIN': 'School Admin Dashboard',
+      'TEACHER': 'Teacher Dashboard',
+      'PARENT': 'Parent Dashboard',
+      'STUDENT': 'Student Dashboard',
+    };
+    return titles[role] || 'Dashboard';
+  };
+
+  const getDashboardSubtitle = (role) => {
+    const subtitles = {
+      'SUPER_ADMIN': 'Manage schools, admins, and users',
+      'ADMIN': 'Manage your school',
+      'TEACHER': 'Manage your classes and students',
+      'PARENT': 'View your children\'s information',
+      'STUDENT': 'View your academic information',
+    };
+    return subtitles[role] || 'Welcome to your dashboard';
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -64,7 +129,7 @@ const Layout = ({ children }) => {
           {sidebarOpen ? (
             <div>
               <p className="text-sm text-gray-400">Logged in as</p>
-              <p className="text-sm font-semibold text-white mt-1">{user?.role}</p>
+              <p className="text-sm font-semibold text-white mt-1">{getRoleDisplayName(user?.role)}</p>
             </div>
           ) : (
             <div className="flex justify-center">
@@ -112,13 +177,13 @@ const Layout = ({ children }) => {
           <div className="px-6 py-4">
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">Super Admin Dashboard</h2>
-                <p className="text-sm text-gray-600">Manage schools, admins, and users</p>
+                <h2 className="text-2xl font-bold text-gray-800">{getDashboardTitle(user?.role)}</h2>
+                <p className="text-sm text-gray-600">{getDashboardSubtitle(user?.role)}</p>
               </div>
               <div className="flex items-center space-x-4">
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-800">{user?.email}</p>
-                  <p className="text-xs text-gray-500">Super Admin</p>
+                  <p className="text-sm font-medium text-gray-800">{user?.email || 'User'}</p>
+                  <p className="text-xs text-gray-500">{getRoleDisplayName(user?.role)}</p>
                 </div>
               </div>
             </div>

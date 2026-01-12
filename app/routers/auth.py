@@ -3,9 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.auth import authenticate_user, create_access_token
+from app.auth import authenticate_user, create_access_token, get_password_hash
 from app.config import settings
-from app.schemas import LoginRequest, Token
+from app.schemas import LoginRequest, Token, SetPasswordRequest, SetPasswordResponse
+from app.models import User
+from app.email_service import validate_password_token, mark_token_as_used
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -72,3 +74,47 @@ def login_json(credentials: LoginRequest, db: Session = Depends(get_db)):
     )
     
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/set-password", response_model=SetPasswordResponse)
+def set_password(
+    request: SetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Set password for a user using a password setup token.
+    This endpoint is used when a user receives an invitation email
+    and needs to set their password for the first time.
+    """
+    # Validate token
+    password_token = validate_password_token(db, request.token)
+    
+    # Get user
+    user = db.query(User).filter(User.id == password_token.user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Validate password (basic validation - you can add more rules)
+    if len(request.password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters long"
+        )
+    
+    # Hash and set password
+    hashed_password = get_password_hash(request.password)
+    user.password = hashed_password
+    
+    # Mark token as used
+    mark_token_as_used(db, password_token)
+    
+    # Commit changes
+    db.commit()
+    
+    return SetPasswordResponse(
+        success=True,
+        message="Password set successfully. You can now log in."
+    )

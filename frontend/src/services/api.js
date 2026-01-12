@@ -44,6 +44,10 @@ export const authAPI = {
     const response = await api.post('/auth/login-json', { email, password });
     return response.data;
   },
+  setPassword: async (token, password) => {
+    const response = await api.post('/auth/set-password', { token, password });
+    return response.data;
+  },
 };
 
 // Schools API
@@ -88,6 +92,16 @@ export const adminsAPI = {
     const response = await api.get(`/schools/${schoolId}/admins`);
     return response.data;
   },
+  // Invite admin via email (new email-based flow)
+  invite: async (adminData) => {
+    const response = await api.post('/super/invite-admin', {
+      name: adminData.name,
+      email: adminData.email,
+      school_id: parseInt(adminData.school_id)
+    });
+    return response.data;
+  },
+  // Legacy create endpoint (still available but not recommended)
   create: async (schoolId, adminData) => {
     const response = await api.post(`/schools/${schoolId}/admins`, adminData);
     return response.data;

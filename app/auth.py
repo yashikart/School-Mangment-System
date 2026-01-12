@@ -36,12 +36,31 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
-    """Authenticate a user by email and password."""
+    """
+    Authenticate a user by email and password.
+    
+    Checks:
+    - User exists
+    - User has a password set (password is not None)
+    - User is active (is_active is True)
+    - Password matches
+    """
     user = db.query(User).filter(User.email == email).first()
     if not user:
         return None
+    
+    # Check if user is active
+    if not user.is_active:
+        return None
+    
+    # Check if password is set
+    if user.password is None:
+        return None
+    
+    # Verify password
     if not verify_password(password, user.password):
         return None
+    
     return user
 
 
@@ -58,7 +77,8 @@ def create_super_admin(db: Session, name: str, email: str, password: str) -> Use
         email=email,
         password=hashed_password,
         role=UserRole.SUPER_ADMIN,
-        school_id=None
+        school_id=None,
+        is_active=True
     )
     db.add(user)
     db.commit()

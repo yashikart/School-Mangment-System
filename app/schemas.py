@@ -44,3 +44,27 @@ class SuperAdminSetupResponse(BaseModel):
     success: bool
     message: str
     already_exists: bool = False
+
+
+# Password Setup Schemas
+class SetPasswordRequest(BaseModel):
+    token: str
+    password: str
+
+
+class SetPasswordResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class InviteAdminRequest(BaseModel):
+    name: str
+    email: EmailStr
+    school_id: int
+
+
+class InviteAdminResponse(BaseModel):
+    success: bool
+    message: str
+    admin_id: int
+    email: str
