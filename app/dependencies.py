@@ -53,3 +53,20 @@ async def get_current_super_admin(
             detail="Not enough permissions. SUPER_ADMIN access required."
         )
     return current_user
+
+
+async def get_current_admin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Verify that the current user is an ADMIN (School Admin)."""
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions. School Admin access required."
+        )
+    if not current_user.school_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="School Admin must be assigned to a school."
+        )
+    return current_user

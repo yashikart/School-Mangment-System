@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
+from datetime import date, datetime
 from app.models import UserRole
 
 
@@ -57,6 +58,35 @@ class SetPasswordResponse(BaseModel):
     message: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+class ResetPasswordResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class ChangePasswordResponse(BaseModel):
+    success: bool
+    message: str
+
+
 class InviteAdminRequest(BaseModel):
     name: str
     email: EmailStr
@@ -68,3 +98,276 @@ class InviteAdminResponse(BaseModel):
     message: str
     admin_id: int
     email: str
+
+
+# ==================== SCHOOL ADMIN DASHBOARD SCHEMAS ====================
+
+# Teacher Schemas
+class TeacherCreate(BaseModel):
+    name: str
+    email: EmailStr
+    subject: Optional[str] = None
+
+
+class TeacherResponse(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+    subject: Optional[str] = None
+    school_id: Optional[int] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class TeacherUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    subject: Optional[str] = None
+
+
+# Student Schemas
+class StudentCreate(BaseModel):
+    name: str
+    email: EmailStr
+    grade: str
+    parent_email: Optional[EmailStr] = None
+
+
+class StudentResponse(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+    grade: Optional[str] = None
+    school_id: Optional[int] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class StudentUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    grade: Optional[str] = None
+
+
+# Parent Schemas
+class ParentCreate(BaseModel):
+    name: str
+    email: EmailStr
+    student_email: Optional[EmailStr] = None
+
+
+class ParentResponse(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+    school_id: Optional[int] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class ParentUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+
+# Subject Schemas
+class SubjectCreate(BaseModel):
+    name: str
+    code: Optional[str] = None
+
+
+class SubjectResponse(BaseModel):
+    id: int
+    name: str
+    code: Optional[str] = None
+    school_id: int
+    
+    class Config:
+        from_attributes = True
+
+
+# Class Schemas
+class ClassCreate(BaseModel):
+    name: str
+    grade: str
+    subject_id: int
+    teacher_id: int
+    academic_year: Optional[str] = None
+
+
+class ClassResponse(BaseModel):
+    id: int
+    name: str
+    grade: str
+    subject_id: int
+    teacher_id: int
+    school_id: int
+    academic_year: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# Timetable Schemas
+class TimetableSlotCreate(BaseModel):
+    class_id: int
+    subject_id: int
+    teacher_id: int
+    day_of_week: int  # 0=Monday, 6=Sunday
+    start_time: str  # Format: "HH:MM"
+    end_time: str  # Format: "HH:MM"
+    room: Optional[str] = None
+
+
+class TimetableSlotResponse(BaseModel):
+    id: int
+    class_id: int
+    subject_id: int
+    teacher_id: int
+    school_id: int
+    day_of_week: int
+    start_time: str
+    end_time: str
+    room: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# Holiday Schemas
+class HolidayCreate(BaseModel):
+    name: str
+    start_date: date
+    end_date: date
+    description: Optional[str] = None
+
+
+class HolidayResponse(BaseModel):
+    id: int
+    name: str
+    start_date: date
+    end_date: date
+    description: Optional[str] = None
+    school_id: int
+    
+    class Config:
+        from_attributes = True
+
+
+# Event Schemas
+class EventCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    event_date: date
+    event_time: Optional[str] = None  # Format: "HH:MM"
+    event_type: str  # e.g., "Exam", "PTM", "Annual Day"
+
+
+class EventResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str] = None
+    event_date: date
+    event_time: Optional[str] = None
+    event_type: str
+    school_id: int
+    
+    class Config:
+        from_attributes = True
+
+
+# Announcement Schemas
+class AnnouncementCreate(BaseModel):
+    title: str
+    content: str
+    target_audience: str  # "TEACHERS", "STUDENTS", "PARENTS", "EVERYONE"
+
+
+class AnnouncementResponse(BaseModel):
+    id: int
+    title: str
+    content: str
+    target_audience: str
+    school_id: int
+    published_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Dashboard Stats Schema
+class DashboardStatsResponse(BaseModel):
+    total_teachers: int
+    total_students: int
+    total_parents: int
+    total_classes: int
+    total_lessons: int
+    todays_classes: int
+    upcoming_holidays: int
+    upcoming_events: int
+
+
+# Excel Upload Response Schema
+class ExcelUploadResponse(BaseModel):
+    success: bool
+    message: str
+    success_count: int
+    failed_count: int
+    failed_rows: List[dict] = []
+
+
+# Parent-Student Mapping Schemas
+class StudentParentLinkCreate(BaseModel):
+    student_id: int
+    parent_id: int
+    relationship_type: Optional[str] = "Parent"
+
+
+class StudentParentLinkResponse(BaseModel):
+    id: int
+    student_id: int
+    parent_id: int
+    relationship_type: Optional[str] = None
+    student_name: str
+    student_email: str
+    parent_name: str
+    parent_email: str
+    
+    class Config:
+        from_attributes = True
+
+
+class StudentWithParentsResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+    grade: Optional[str] = None
+    school_id: Optional[int] = None
+    linked_parents: List[dict] = []
+    
+    class Config:
+        from_attributes = True
+
+
+class ParentWithStudentsResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+    school_id: Optional[int] = None
+    linked_students: List[dict] = []
+    
+    class Config:
+        from_attributes = True
+
+
+class ParentStudentStatsResponse(BaseModel):
+    total_parents: int
+    total_students: int
+    unlinked_students: int
+    unlinked_parents: int
+    total_links: int
+    students_per_parent: List[dict] = []
+    parents_per_student: List[dict] = []

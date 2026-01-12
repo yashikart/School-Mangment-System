@@ -24,10 +24,14 @@ const Layout = ({ children }) => {
     } else if (role === 'ADMIN') {
       return [
         { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
-        { id: 'school', label: 'My School', icon: '🏫', path: '/dashboard/school' },
         { id: 'teachers', label: 'Teachers', icon: '👨‍🏫', path: '/dashboard/teachers' },
         { id: 'students', label: 'Students', icon: '👨‍🎓', path: '/dashboard/students' },
         { id: 'parents', label: 'Parents', icon: '👨‍👩‍👧', path: '/dashboard/parents' },
+        { id: 'classes', label: 'Classes', icon: '📚', path: '/dashboard/classes' },
+        { id: 'timetable', label: 'Timetable', icon: '📅', path: '/dashboard/timetable' },
+        { id: 'lessons', label: 'Lessons', icon: '📖', path: '/dashboard/lessons' },
+        { id: 'holidays-events', label: 'Holidays & Events', icon: '🎉', path: '/dashboard/holidays-events' },
+        { id: 'announcements', label: 'Announcements', icon: '📢', path: '/dashboard/announcements' },
       ];
     } else if (role === 'TEACHER') {
       return [

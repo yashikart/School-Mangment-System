@@ -10,3 +10,6 @@ pydantic-settings>=2.1.0
 fastapi-mail>=1.4.1
 aiosmtplib>=3.0.0
 fastapi_mail
+openpyxl>=3.1.2
+pandas>=2.1.0
+python-multipart>=0.0.6

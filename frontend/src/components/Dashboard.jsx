@@ -1,5 +1,6 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import Layout from './Layout';
 import DashboardOverview from './DashboardOverview';
 import SchoolList from './SchoolList';
@@ -11,19 +12,51 @@ import CreateAdmin from './CreateAdmin';
 import EditAdmin from './EditAdmin';
 import ViewAllUsers from './ViewAllUsers';
 
+// School Admin Components
+import SchoolAdminDashboard from './admin/SchoolAdminDashboard';
+import TeachersManagement from './admin/TeachersManagement';
+import StudentsManagement from './admin/StudentsManagement';
+import ParentsManagement from './admin/ParentsManagement';
+import ClassesManagement from './admin/ClassesManagement';
+import TimetableManagement from './admin/TimetableManagement';
+import HolidaysEvents from './admin/HolidaysEvents';
+import Announcements from './admin/Announcements';
+import LessonsView from './admin/LessonsView';
+
 const Dashboard = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+
   return (
     <Layout>
       <Routes>
-        <Route index element={<DashboardOverview />} />
-        <Route path="/schools/:id/edit" element={<EditSchool />} />
-        <Route path="/schools/:id" element={<SchoolDetails />} />
-        <Route path="/schools" element={<SchoolList />} />
-        <Route path="/create-school" element={<CreateSchool />} />
-        <Route path="/admins/:id/edit" element={<EditAdmin />} />
-        <Route path="/admins" element={<AdminList />} />
-        <Route path="/create-admin" element={<CreateAdmin />} />
-        <Route path="/users" element={<ViewAllUsers />} />
+        {isAdmin ? (
+          // School Admin Routes
+          <>
+            <Route index element={<SchoolAdminDashboard />} />
+            <Route path="/teachers" element={<TeachersManagement />} />
+            <Route path="/students" element={<StudentsManagement />} />
+            <Route path="/parents" element={<ParentsManagement />} />
+            <Route path="/classes" element={<ClassesManagement />} />
+            <Route path="/timetable" element={<TimetableManagement />} />
+            <Route path="/holidays-events" element={<HolidaysEvents />} />
+            <Route path="/announcements" element={<Announcements />} />
+            <Route path="/lessons" element={<LessonsView />} />
+          </>
+        ) : (
+          // Super Admin Routes
+          <>
+            <Route index element={<DashboardOverview />} />
+            <Route path="/schools/:id/edit" element={<EditSchool />} />
+            <Route path="/schools/:id" element={<SchoolDetails />} />
+            <Route path="/schools" element={<SchoolList />} />
+            <Route path="/create-school" element={<CreateSchool />} />
+            <Route path="/admins/:id/edit" element={<EditAdmin />} />
+            <Route path="/admins" element={<AdminList />} />
+            <Route path="/create-admin" element={<CreateAdmin />} />
+            <Route path="/users" element={<ViewAllUsers />} />
+          </>
+        )}
       </Routes>
     </Layout>
   );

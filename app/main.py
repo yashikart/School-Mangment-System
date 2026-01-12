@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 from app.routers import auth, super_admin, schools, dashboard
+from app.routers.admin import dashboard as admin_dashboard
 from app.config import settings
 
 # Note: Database tables will be created on first request or via setup script
@@ -35,6 +36,7 @@ app.include_router(auth.router)
 app.include_router(super_admin.router)
 app.include_router(schools.router)
 app.include_router(dashboard.router)
+app.include_router(admin_dashboard.router)  # School Admin Dashboard
 
 
 @app.get("/")
