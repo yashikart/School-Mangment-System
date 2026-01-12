@@ -45,7 +45,9 @@ const TeachersManagement = () => {
       fetchTeachers();
       alert('Teacher created successfully! Login credentials sent via email.');
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to create teacher');
+      console.error('Error creating teacher:', err);
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to create teacher. Please check the console for details.';
+      alert(`Error: ${errorMessage}`);
     }
   };
 

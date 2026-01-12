@@ -49,8 +49,11 @@ async def validate_email(email: str, db: Session) -> Tuple[bool, Optional[str]]:
     if "@" not in email or "." not in email.split("@")[1]:
         return False, "Invalid email format"
     
-    # Check for duplicate email
-    existing_user = db.query(User).filter(User.email == email.lower().strip()).first()
+    # Check for duplicate email (only for active users)
+    existing_user = db.query(User).filter(
+        User.email == email.lower().strip(),
+        User.is_active == True
+    ).first()
     if existing_user:
         return False, f"Email already exists: {email}"
     

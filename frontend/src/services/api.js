@@ -252,6 +252,14 @@ export const schoolAdminAPI = {
     const response = await api.post(`/admin/classes/${classId}/students/${studentId}`);
     return response.data;
   },
+  getClassStudents: async (classId) => {
+    const response = await api.get(`/admin/classes/${classId}/students`);
+    return response.data;
+  },
+  removeStudentFromClass: async (classId, studentId) => {
+    const response = await api.delete(`/admin/classes/${classId}/students/${studentId}`);
+    return response.data;
+  },
   
   // Timetable
   getTimetable: async (classId = null) => {
@@ -342,6 +350,12 @@ export const schoolAdminAPI = {
     const response = await api.post('/admin/parent-student/upload-combined-excel', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
+    return response.data;
+  },
+  
+  // Analytics
+  getAnalytics: async () => {
+    const response = await api.get('/admin/analytics');
     return response.data;
   },
 };

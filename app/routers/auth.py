@@ -11,7 +11,7 @@ from app.schemas import (
     ResetPasswordRequest, ResetPasswordResponse,
     ChangePasswordRequest, ChangePasswordResponse
 )
-from app.models import User
+from app.models import User, UserRole
 from app.email_service import (
     validate_password_token, mark_token_as_used,
     generate_password_token, send_password_reset_email
@@ -64,6 +64,39 @@ def login_json(credentials: LoginRequest, db: Session = Depends(get_db)):
     Alternative login endpoint using JSON body (email/password).
     Use this for programmatic API access or frontend integrations.
     """
+    # First check if user exists
+    user = db.query(User).filter(User.email == credentials.email).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Check specific issues for better error messages
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account is inactive. Please contact administrator.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if user.password is None:
+        if user.role == UserRole.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Password not set. Please check your email for password setup link.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Password not set. Please contact administrator.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    
+    # Now authenticate
     user = authenticate_user(db, credentials.email, credentials.password)
     if not user:
         raise HTTPException(

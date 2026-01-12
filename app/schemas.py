@@ -132,6 +132,7 @@ class StudentCreate(BaseModel):
     email: EmailStr
     grade: str
     parent_email: Optional[EmailStr] = None
+    parent_name: Optional[str] = None
 
 
 class StudentResponse(BaseModel):
@@ -140,6 +141,8 @@ class StudentResponse(BaseModel):
     email: EmailStr
     grade: Optional[str] = None
     school_id: Optional[int] = None
+    parent_emails: Optional[List[str]] = None  # List of linked parent emails
+    parent_names: Optional[List[str]] = None  # List of linked parent names
     
     class Config:
         from_attributes = True
@@ -206,6 +209,8 @@ class ClassResponse(BaseModel):
     teacher_id: int
     school_id: int
     academic_year: Optional[str] = None
+    subject_name: Optional[str] = None  # Subject name for display
+    teacher_name: Optional[str] = None  # Teacher name for display
     
     class Config:
         from_attributes = True
@@ -257,13 +262,20 @@ class HolidayResponse(BaseModel):
         from_attributes = True
 
 
+class HolidayUpdate(BaseModel):
+    name: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    description: Optional[str] = None
+
+
 # Event Schemas
 class EventCreate(BaseModel):
     title: str
     description: Optional[str] = None
     event_date: date
-    event_time: Optional[str] = None  # Format: "HH:MM"
-    event_type: str  # e.g., "Exam", "PTM", "Annual Day"
+    event_time: Optional[str] = None
+    event_type: str  # "Exam", "PTM", "Annual Day", etc.
 
 
 class EventResponse(BaseModel):
@@ -277,6 +289,14 @@ class EventResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class EventUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    event_date: Optional[date] = None
+    event_time: Optional[str] = None
+    event_type: Optional[str] = None
 
 
 # Announcement Schemas
@@ -298,7 +318,12 @@ class AnnouncementResponse(BaseModel):
         from_attributes = True
 
 
-# Dashboard Stats Schema
+class AnnouncementUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    target_audience: Optional[str] = None
+
+
 class DashboardStatsResponse(BaseModel):
     total_teachers: int
     total_students: int
@@ -310,7 +335,6 @@ class DashboardStatsResponse(BaseModel):
     upcoming_events: int
 
 
-# Excel Upload Response Schema
 class ExcelUploadResponse(BaseModel):
     success: bool
     message: str
@@ -371,3 +395,58 @@ class ParentStudentStatsResponse(BaseModel):
     total_links: int
     students_per_parent: List[dict] = []
     parents_per_student: List[dict] = []
+
+
+# Analytics/Visualization Schemas
+class TeacherWorkloadResponse(BaseModel):
+    teacher_id: int
+    teacher_name: str
+    subject: Optional[str] = None
+    total_classes: int
+    total_students: int
+
+
+class GradeDistributionResponse(BaseModel):
+    grade: str
+    student_count: int
+    teacher_count: int
+    class_count: int
+
+
+class SubjectDistributionResponse(BaseModel):
+    subject_id: int
+    subject_name: str
+    student_count: int
+    teacher_count: int
+    class_count: int
+
+
+class ParentStudentRelationResponse(BaseModel):
+    parent_id: int
+    parent_name: str
+    parent_email: str
+    children_count: int
+    children: List[dict] = []
+
+
+class AnalyticsResponse(BaseModel):
+    # Teacher Analytics
+    teacher_workload: List[TeacherWorkloadResponse] = []
+    teachers_by_subject: List[dict] = []
+    
+    # Student Analytics
+    students_by_grade: List[GradeDistributionResponse] = []
+    students_by_subject: List[SubjectDistributionResponse] = []
+    
+    # Parent Analytics
+    parents_by_children_count: List[dict] = []
+    parent_student_relations: List[ParentStudentRelationResponse] = []
+    
+    # Overall Stats
+    total_teachers: int
+    total_students: int
+    total_parents: int
+    total_classes: int
+    total_subjects: int
+    linked_students: int
+    unlinked_students: int

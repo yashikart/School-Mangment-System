@@ -68,8 +68,11 @@ async def upload_students_parents_combined_excel(
                     result.add_failure(row_number, student_email, f"Student: {error_msg}", row.to_dict())
                     continue
                 
-                # Check if student already exists
-                existing_student = db.query(User).filter(User.email == student_email).first()
+                # Check if student already exists (only active users)
+                existing_student = db.query(User).filter(
+                    User.email == student_email,
+                    User.is_active == True
+                ).first()
                 
                 if existing_student:
                     student = existing_student
@@ -106,8 +109,11 @@ async def upload_students_parents_combined_excel(
                         result.add_failure(row_number, parent_email, f"Parent: {error_msg}", row.to_dict())
                         continue
                     
-                    # Check if parent already exists
-                    existing_parent = db.query(User).filter(User.email == parent_email).first()
+                    # Check if parent already exists (only active users)
+                    existing_parent = db.query(User).filter(
+                        User.email == parent_email,
+                        User.is_active == True
+                    ).first()
                     
                     if existing_parent:
                         parent = existing_parent

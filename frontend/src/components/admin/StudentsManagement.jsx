@@ -14,7 +14,8 @@ const StudentsManagement = () => {
     name: '',
     email: '',
     grade: '',
-    parent_email: ''
+    parent_email: '',
+    parent_name: ''
   });
   const [editingStudent, setEditingStudent] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
@@ -42,7 +43,7 @@ const StudentsManagement = () => {
     try {
       await schoolAdminAPI.createStudent(formData);
       setShowCreateForm(false);
-      setFormData({ name: '', email: '', grade: '', parent_email: '' });
+      setFormData({ name: '', email: '', grade: '', parent_email: '', parent_name: '' });
       fetchStudents();
       alert('Student created successfully! Login credentials sent via email.');
     } catch (err) {
@@ -75,12 +76,13 @@ const StudentsManagement = () => {
 
   const handleEdit = (student) => {
     setEditingStudent(student);
-    setFormData({
-      name: student.name,
-      email: student.email,
-      grade: student.grade || '',
-      parent_email: ''
-    });
+      setFormData({
+        name: student.name,
+        email: student.email,
+        grade: student.grade || '',
+        parent_email: '',
+        parent_name: ''
+      });
     setShowCreateForm(true);
   };
 
@@ -94,7 +96,7 @@ const StudentsManagement = () => {
       });
       setShowCreateForm(false);
       setEditingStudent(null);
-      setFormData({ name: '', email: '', grade: '', parent_email: '' });
+      setFormData({ name: '', email: '', grade: '', parent_email: '', parent_name: '' });
       fetchStudents();
       alert('Student updated successfully!');
     } catch (err) {
@@ -220,16 +222,31 @@ const StudentsManagement = () => {
               />
             </div>
             {!editingStudent && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Parent Email</label>
-                <input
-                  type="email"
-                  value={formData.parent_email}
-                  onChange={(e) => setFormData({ ...formData, parent_email: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Optional: Link to existing parent"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Parent Name</label>
+                  <input
+                    type="text"
+                    value={formData.parent_name}
+                    onChange={(e) => setFormData({ ...formData, parent_name: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Optional: Parent's name (if creating new parent)"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Parent Email</label>
+                  <input
+                    type="email"
+                    value={formData.parent_email}
+                    onChange={(e) => setFormData({ ...formData, parent_email: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Optional: Link to existing parent or create new"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    If parent email exists, it will link to existing parent. If not, a new parent will be created.
+                  </p>
+                </div>
+              </>
             )}
             <div className="flex gap-3">
               <button
@@ -243,7 +260,7 @@ const StudentsManagement = () => {
                 onClick={() => {
                   setShowCreateForm(false);
                   setEditingStudent(null);
-                  setFormData({ name: '', email: '', grade: '', parent_email: '' });
+                  setFormData({ name: '', email: '', grade: '', parent_email: '', parent_name: '' });
                 }}
                 className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition"
               >
@@ -272,13 +289,14 @@ const StudentsManagement = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parent Email(s)</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {students.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
                     No students found
                   </td>
                 </tr>
@@ -289,6 +307,24 @@ const StudentsManagement = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.email}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.grade || '-'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {student.parent_emails && Array.isArray(student.parent_emails) && student.parent_emails.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {student.parent_emails.map((email, idx) => {
+                            const parentName = student.parent_names && student.parent_names[idx] ? student.parent_names[idx] : '';
+                            return (
+                              <span key={idx} className="inline-flex items-center px-2 py-1 rounded-md bg-green-100 text-green-800 text-xs font-medium">
+                                <span className="mr-1">✓</span> 
+                                {parentName && <span className="font-semibold mr-1">{parentName}</span>}
+                                <span className="text-gray-600">({email})</span>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic">No parent linked</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex gap-2">
                         <button

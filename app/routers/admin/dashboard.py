@@ -25,7 +25,9 @@ from app.schemas import (
     AnnouncementCreate, AnnouncementResponse, DashboardStatsResponse,
     StudentParentLinkCreate, StudentParentLinkResponse,
     StudentWithParentsResponse, ParentWithStudentsResponse,
-    ParentStudentStatsResponse
+    ParentStudentStatsResponse,
+    AnalyticsResponse, TeacherWorkloadResponse, GradeDistributionResponse,
+    SubjectDistributionResponse, ParentStudentRelationResponse
 )
 from app.utils.password_generator import generate_unique_password
 from app.utils.excel_upload import upload_teachers_excel, upload_students_excel, upload_parents_excel
@@ -166,42 +168,70 @@ async def create_teacher(
     current_user: User = Depends(get_current_admin)
 ):
     """Create a new teacher."""
-    school_id = current_user.school_id
-    
-    # Check if email already exists
-    existing_user = db.query(User).filter(User.email == teacher_data.email).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already exists"
-        )
-    
-    # Generate unique password
-    password = generate_unique_password(db, teacher_data.email, teacher_data.name, UserRole.TEACHER.value, school_id)
-    hashed_password = get_password_hash(password)
-    
-    # Create teacher
-    teacher = User(
-        name=teacher_data.name,
-        email=teacher_data.email,
-        password=hashed_password,
-        role=UserRole.TEACHER,
-        school_id=school_id,
-        is_active=True,
-        subject=teacher_data.subject
-    )
-    
-    db.add(teacher)
-    db.commit()
-    db.refresh(teacher)
-    
-    # Send login credentials email
     try:
-        await send_login_credentials_email(db, teacher, password, UserRole.TEACHER.value)
-    except Exception as e:
-        print(f"Warning: Failed to send email to {teacher.email}: {str(e)}")
+        school_id = current_user.school_id
+        
+        if school_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Admin account is not associated with a school"
+            )
+        
+        # Check if email already exists
+        existing_user = db.query(User).filter(
+            User.email == teacher_data.email
+        ).first()
+        
+        if existing_user:
+            # If user is active, email is taken
+            if existing_user.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email already exists"
+                )
+            # If user is inactive, we need to free up the email
+            # Change the inactive user's email to make it unique
+            inactive_email = f"{existing_user.email}_deleted_{existing_user.id}_{int(datetime.utcnow().timestamp())}"
+            existing_user.email = inactive_email
+            db.commit()
+        
+        # Generate unique password
+        password = generate_unique_password(db, teacher_data.email, teacher_data.name, UserRole.TEACHER.value, school_id)
+        hashed_password = get_password_hash(password)
+        
+        # Create teacher
+        teacher = User(
+            name=teacher_data.name,
+            email=teacher_data.email,
+            password=hashed_password,
+            role=UserRole.TEACHER,
+            school_id=school_id,
+            is_active=True,
+            subject=teacher_data.subject
+        )
+        
+        db.add(teacher)
+        db.commit()
+        db.refresh(teacher)
+        
+        # Send login credentials email
+        try:
+            await send_login_credentials_email(db, teacher, password, UserRole.TEACHER.value)
+        except Exception as e:
+            print(f"Warning: Failed to send email to {teacher.email}: {str(e)}")
+        
+        return TeacherResponse(id=teacher.id, name=teacher.name, email=teacher.email, subject=teacher_data.subject, school_id=teacher.school_id)
     
-    return TeacherResponse(id=teacher.id, name=teacher.name, email=teacher.email, subject=teacher_data.subject, school_id=teacher.school_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error creating teacher: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create teacher: {str(e)}"
+        )
 
 
 @router.post("/teachers/upload-excel", response_model=ExcelUploadResponse)
@@ -258,10 +288,11 @@ def update_teacher(
         teacher.name = teacher_data.name
     
     if teacher_data.email is not None and teacher_data.email != teacher.email:
-        # Check if new email already exists
+        # Check if new email already exists (only for active users)
         existing_user = db.query(User).filter(
             User.email == teacher_data.email,
-            User.id != teacher_id
+            User.id != teacher_id,
+            User.is_active == True
         ).first()
         if existing_user:
             raise HTTPException(
@@ -341,7 +372,28 @@ def get_students(
         )
     
     students = query.all()
-    return [StudentResponse(id=s.id, name=s.name, email=s.email, grade=grade, school_id=s.school_id) for s in students]
+    result = []
+    for s in students:
+        # Get all linked parent emails and names for this student
+        parent_links = db.query(StudentParent).filter(StudentParent.student_id == s.id).all()
+        parent_emails = []
+        parent_names = []
+        for link in parent_links:
+            parent = db.query(User).filter(User.id == link.parent_id).first()
+            if parent and parent.is_active:
+                parent_emails.append(parent.email)
+                parent_names.append(parent.name)
+        
+        result.append(StudentResponse(
+            id=s.id,
+            name=s.name,
+            email=s.email,
+            grade=s.grade,
+            school_id=s.school_id,
+            parent_emails=parent_emails if parent_emails else None,
+            parent_names=parent_names if parent_names else None
+        ))
+    return result
 
 
 @router.post("/students", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
@@ -354,12 +406,21 @@ async def create_student(
     school_id = current_user.school_id
     
     # Check if email already exists
-    existing_user = db.query(User).filter(User.email == student_data.email).first()
+    existing_user = db.query(User).filter(
+        User.email == student_data.email
+    ).first()
+    
     if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already exists"
-        )
+        # If user is active, email is taken
+        if existing_user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already exists"
+            )
+        # If user is inactive, free up the email by changing the inactive user's email
+        inactive_email = f"{existing_user.email}_deleted_{existing_user.id}_{int(datetime.utcnow().timestamp())}"
+        existing_user.email = inactive_email
+        db.commit()
     
     # Generate unique password
     password = generate_unique_password(db, student_data.email, student_data.name, UserRole.STUDENT.value, school_id)
@@ -372,7 +433,8 @@ async def create_student(
         password=hashed_password,
         role=UserRole.STUDENT,
         school_id=school_id,
-        is_active=True
+        is_active=True,
+        grade=student_data.grade
     )
     
     db.add(student)
@@ -380,13 +442,56 @@ async def create_student(
     
     # Link to parent if provided
     if student_data.parent_email:
+        # Check if parent exists (active or inactive)
         parent = db.query(User).filter(
             User.email == student_data.parent_email,
             User.role == UserRole.PARENT,
             User.school_id == school_id
         ).first()
         
-        if parent:
+        if not parent:
+            # Parent doesn't exist, create it
+            parent_name = student_data.parent_name if student_data.parent_name else "Parent"
+            parent_password = generate_unique_password(db, student_data.parent_email, parent_name, UserRole.PARENT.value, school_id)
+            parent_hashed_password = get_password_hash(parent_password)
+            
+            parent = User(
+                name=parent_name,
+                email=student_data.parent_email,
+                password=parent_hashed_password,
+                role=UserRole.PARENT,
+                school_id=school_id,
+                is_active=True
+            )
+            db.add(parent)
+            db.flush()
+            
+            # Send login credentials email to parent
+            try:
+                await send_login_credentials_email(db, parent, parent_password, UserRole.PARENT.value)
+            except Exception as e:
+                print(f"Warning: Failed to send email to {parent.email}: {str(e)}")
+        else:
+            # Parent exists - update name if provided and current name is default or empty
+            if student_data.parent_name and student_data.parent_name.strip():
+                # Update name if current name is default/empty or if we want to always update
+                if not parent.name or parent.name.strip() == "" or parent.name == "Parent":
+                    parent.name = student_data.parent_name.strip()
+                    db.flush()
+            
+            if not parent.is_active:
+                # Reactivate inactive parent
+                parent.is_active = True
+                db.flush()
+        
+        # Check if link already exists
+        existing_link = db.query(StudentParent).filter(
+            StudentParent.student_id == student.id,
+            StudentParent.parent_id == parent.id
+        ).first()
+        
+        if not existing_link:
+            # Create the link
             student_parent = StudentParent(
                 student_id=student.id,
                 parent_id=parent.id,
@@ -403,7 +508,25 @@ async def create_student(
     except Exception as e:
         print(f"Warning: Failed to send email to {student.email}: {str(e)}")
     
-    return StudentResponse(id=student.id, name=student.name, email=student.email, grade=student_data.grade, school_id=student.school_id)
+    # Get linked parent emails and names for response
+    parent_links = db.query(StudentParent).filter(StudentParent.student_id == student.id).all()
+    parent_emails = []
+    parent_names = []
+    for link in parent_links:
+        parent = db.query(User).filter(User.id == link.parent_id).first()
+        if parent and parent.is_active:
+            parent_emails.append(parent.email)
+            parent_names.append(parent.name)
+    
+    return StudentResponse(
+        id=student.id,
+        name=student.name,
+        email=student.email,
+        grade=student_data.grade,
+        school_id=student.school_id,
+        parent_emails=parent_emails if parent_emails else None,
+        parent_names=parent_names if parent_names else None
+    )
 
 
 @router.post("/students/upload-excel", response_model=ExcelUploadResponse)
@@ -460,10 +583,11 @@ def update_student(
         student.name = student_data.name
     
     if student_data.email is not None and student_data.email != student.email:
-        # Check if new email already exists
+        # Check if new email already exists (only for active users)
         existing_user = db.query(User).filter(
             User.email == student_data.email,
-            User.id != student_id
+            User.id != student_id,
+            User.is_active == True
         ).first()
         if existing_user:
             raise HTTPException(
@@ -479,7 +603,7 @@ def update_student(
         id=student.id,
         name=student.name,
         email=student.email,
-        grade=student_data.grade,
+        grade=student.grade,
         school_id=student.school_id
     )
 
@@ -552,12 +676,21 @@ async def create_parent(
     school_id = current_user.school_id
     
     # Check if email already exists
-    existing_user = db.query(User).filter(User.email == parent_data.email).first()
+    existing_user = db.query(User).filter(
+        User.email == parent_data.email
+    ).first()
+    
     if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already exists"
-        )
+        # If user is active, email is taken
+        if existing_user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already exists"
+            )
+        # If user is inactive, free up the email by changing the inactive user's email
+        inactive_email = f"{existing_user.email}_deleted_{existing_user.id}_{int(datetime.utcnow().timestamp())}"
+        existing_user.email = inactive_email
+        db.commit()
     
     # Generate unique password
     password = generate_unique_password(db, parent_data.email, parent_data.name, UserRole.PARENT.value, school_id)
@@ -658,10 +791,11 @@ def update_parent(
         parent.name = parent_data.name
     
     if parent_data.email is not None and parent_data.email != parent.email:
-        # Check if new email already exists
+        # Check if new email already exists (only for active users)
         existing_user = db.query(User).filter(
             User.email == parent_data.email,
-            User.id != parent_id
+            User.id != parent_id,
+            User.is_active == True
         ).first()
         if existing_user:
             raise HTTPException(
@@ -757,7 +891,26 @@ def get_classes(
     school_id = current_user.school_id
     
     classes = db.query(Class).filter(Class.school_id == school_id).all()
-    return classes
+    
+    # Get subject and teacher names for each class
+    result = []
+    for cls in classes:
+        subject = db.query(Subject).filter(Subject.id == cls.subject_id).first()
+        teacher = db.query(User).filter(User.id == cls.teacher_id).first()
+        
+        result.append(ClassResponse(
+            id=cls.id,
+            name=cls.name,
+            grade=cls.grade,
+            subject_id=cls.subject_id,
+            teacher_id=cls.teacher_id,
+            school_id=cls.school_id,
+            academic_year=cls.academic_year,
+            subject_name=subject.name if subject else None,
+            teacher_name=teacher.name if teacher else None
+        ))
+    
+    return result
 
 
 @router.post("/classes", response_model=ClassResponse, status_code=status.HTTP_201_CREATED)
@@ -807,7 +960,21 @@ def create_class(
     db.commit()
     db.refresh(class_obj)
     
-    return class_obj
+    # Get subject and teacher names for response
+    subject = db.query(Subject).filter(Subject.id == class_obj.subject_id).first()
+    teacher = db.query(User).filter(User.id == class_obj.teacher_id).first()
+    
+    return ClassResponse(
+        id=class_obj.id,
+        name=class_obj.name,
+        grade=class_obj.grade,
+        subject_id=class_obj.subject_id,
+        teacher_id=class_obj.teacher_id,
+        school_id=class_obj.school_id,
+        academic_year=class_obj.academic_year,
+        subject_name=subject.name if subject else None,
+        teacher_name=teacher.name if teacher else None
+    )
 
 
 @router.post("/classes/{class_id}/students/{student_id}", status_code=status.HTTP_201_CREATED)
@@ -866,6 +1033,102 @@ def assign_student_to_class(
     db.commit()
     
     return {"success": True, "message": "Student assigned to class"}
+
+
+@router.get("/classes/{class_id}/students", response_model=List[StudentResponse])
+def get_class_students(
+    class_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin)
+):
+    """Get all students enrolled in a specific class."""
+    school_id = current_user.school_id
+    
+    # Verify class belongs to school
+    class_obj = db.query(Class).filter(
+        Class.id == class_id,
+        Class.school_id == school_id
+    ).first()
+    
+    if not class_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Class not found"
+        )
+    
+    # Get all students enrolled in this class
+    class_students = db.query(ClassStudent).filter(
+        ClassStudent.class_id == class_id
+    ).all()
+    
+    result = []
+    for cs in class_students:
+        student = db.query(User).filter(
+            User.id == cs.student_id,
+            User.is_active == True
+        ).first()
+        if student:
+            # Get parent info
+            parent_links = db.query(StudentParent).filter(StudentParent.student_id == student.id).all()
+            parent_emails = []
+            parent_names = []
+            for link in parent_links:
+                parent = db.query(User).filter(User.id == link.parent_id).first()
+                if parent and parent.is_active:
+                    parent_emails.append(parent.email)
+                    parent_names.append(parent.name)
+            
+            result.append(StudentResponse(
+                id=student.id,
+                name=student.name,
+                email=student.email,
+                grade=student.grade,
+                school_id=student.school_id,
+                parent_emails=parent_emails if parent_emails else None,
+                parent_names=parent_names if parent_names else None
+            ))
+    
+    return result
+
+
+@router.delete("/classes/{class_id}/students/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_student_from_class(
+    class_id: int,
+    student_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin)
+):
+    """Remove a student from a class."""
+    school_id = current_user.school_id
+    
+    # Verify class belongs to school
+    class_obj = db.query(Class).filter(
+        Class.id == class_id,
+        Class.school_id == school_id
+    ).first()
+    
+    if not class_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Class not found"
+        )
+    
+    # Find the enrollment
+    enrollment = db.query(ClassStudent).filter(
+        ClassStudent.class_id == class_id,
+        ClassStudent.student_id == student_id
+    ).first()
+    
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Student is not enrolled in this class"
+        )
+    
+    db.delete(enrollment)
+    db.commit()
+    
+    return None
 
 
 # ==================== TIMETABLE MANAGEMENT ====================
@@ -1482,25 +1745,36 @@ def get_parent_student_stats(
             StudentParent.student_id == student.id
         ).all()
         if links:
-            linked_student_ids.add(student.id)
+            # Only count if parent is active
             for link in links:
-                parent = db.query(User).filter(User.id == link.parent_id).first()
-                if parent and parent.school_id == school_id:
+                parent = db.query(User).filter(
+                    User.id == link.parent_id,
+                    User.school_id == school_id,
+                    User.is_active == True
+                ).first()
+                if parent:
+                    linked_student_ids.add(student.id)
                     linked_parent_ids.add(parent.id)
     
     unlinked_students = total_students - len(linked_student_ids)
     unlinked_parents = total_parents - len(linked_parent_ids)
     
-    # Count total links
-    total_links = db.query(StudentParent).join(User, StudentParent.student_id == User.id).filter(
-        User.school_id == school_id
+    # Count total links (only active students and parents)
+    total_links = db.query(StudentParent).join(
+        User, StudentParent.student_id == User.id
+    ).filter(
+        User.school_id == school_id,
+        User.is_active == True
     ).count()
     
-    # Students per parent (for chart)
+    # Students per parent (for chart) - only count active students
     students_per_parent = []
     for parent in all_parents:
-        links = db.query(StudentParent).filter(
-            StudentParent.parent_id == parent.id
+        links = db.query(StudentParent).join(
+            User, StudentParent.student_id == User.id
+        ).filter(
+            StudentParent.parent_id == parent.id,
+            User.is_active == True
         ).count()
         if links > 0:
             students_per_parent.append({
@@ -1508,11 +1782,14 @@ def get_parent_student_stats(
                 "student_count": links
             })
     
-    # Parents per student (for chart)
+    # Parents per student (for chart) - only count active parents
     parents_per_student = []
     for student in all_students:
-        links = db.query(StudentParent).filter(
-            StudentParent.student_id == student.id
+        links = db.query(StudentParent).join(
+            User, StudentParent.parent_id == User.id
+        ).filter(
+            StudentParent.student_id == student.id,
+            User.is_active == True
         ).count()
         if links > 0:
             parents_per_student.append({
@@ -1557,4 +1834,216 @@ async def upload_students_parents_combined_excel_endpoint(
         success_count=result.success_count,
         failed_count=len(result.failed_rows),
         failed_rows=result.failed_rows
+    )
+
+
+# ==================== ANALYTICS & VISUALIZATIONS ====================
+
+@router.get("/analytics", response_model=AnalyticsResponse)
+def get_analytics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin)
+):
+    """Get comprehensive analytics data for visualizations."""
+    school_id = current_user.school_id
+    
+    # Get all active teachers
+    teachers = db.query(User).filter(
+        User.school_id == school_id,
+        User.role == UserRole.TEACHER,
+        User.is_active == True
+    ).all()
+    
+    # Get all active students
+    students = db.query(User).filter(
+        User.school_id == school_id,
+        User.role == UserRole.STUDENT,
+        User.is_active == True
+    ).all()
+    
+    # Get all active parents
+    parents = db.query(User).filter(
+        User.school_id == school_id,
+        User.role == UserRole.PARENT,
+        User.is_active == True
+    ).all()
+    
+    # Get all classes
+    classes = db.query(Class).filter(Class.school_id == school_id).all()
+    
+    # Get all subjects
+    subjects = db.query(Subject).filter(Subject.school_id == school_id).all()
+    
+    # ========== TEACHER ANALYTICS ==========
+    
+    # Teacher Workload (classes per teacher)
+    teacher_workload = []
+    teachers_by_subject = {}
+    
+    for teacher in teachers:
+        teacher_classes = [c for c in classes if c.teacher_id == teacher.id]
+        total_students = 0
+        
+        for cls in teacher_classes:
+            # Count only active students in this class
+            class_students = db.query(ClassStudent).join(User).filter(
+                ClassStudent.class_id == cls.id,
+                User.id == ClassStudent.student_id,
+                User.is_active == True
+            ).count()
+            total_students += class_students
+        
+        teacher_workload.append(TeacherWorkloadResponse(
+            teacher_id=teacher.id,
+            teacher_name=teacher.name,
+            subject=teacher.subject,
+            total_classes=len(teacher_classes),
+            total_students=total_students
+        ))
+        
+        # Count teachers by subject
+        if teacher.subject:
+            if teacher.subject not in teachers_by_subject:
+                teachers_by_subject[teacher.subject] = 0
+            teachers_by_subject[teacher.subject] += 1
+    
+    teachers_by_subject_list = [{"subject": k, "count": v} for k, v in teachers_by_subject.items()]
+    
+    # ========== STUDENT ANALYTICS ==========
+    
+    # Students by Grade
+    students_by_grade = {}
+    for student in students:
+        grade = student.grade or "Unknown"
+        if grade not in students_by_grade:
+            students_by_grade[grade] = {"students": 0, "teachers": set(), "classes": set()}
+        students_by_grade[grade]["students"] += 1
+        
+        # Get classes for this student (only active classes)
+        student_classes = db.query(ClassStudent).filter(ClassStudent.student_id == student.id).all()
+        for sc in student_classes:
+            cls = db.query(Class).filter(Class.id == sc.class_id).first()
+            if cls:
+                students_by_grade[grade]["classes"].add(cls.id)
+                students_by_grade[grade]["teachers"].add(cls.teacher_id)
+    
+    grade_distribution = []
+    for grade, data in students_by_grade.items():
+        grade_distribution.append(GradeDistributionResponse(
+            grade=grade,
+            student_count=data["students"],
+            teacher_count=len(data["teachers"]),
+            class_count=len(data["classes"])
+        ))
+    
+    # Students by Subject
+    students_by_subject = {}
+    for subject in subjects:
+        subject_classes = [c for c in classes if c.subject_id == subject.id]
+        student_ids = set()
+        teacher_ids = set()
+        
+        for cls in subject_classes:
+            teacher_ids.add(cls.teacher_id)
+            # Only count active students
+            class_students = db.query(ClassStudent).join(User).filter(
+                ClassStudent.class_id == cls.id,
+                User.id == ClassStudent.student_id,
+                User.is_active == True
+            ).all()
+            for cs in class_students:
+                student_ids.add(cs.student_id)
+        
+        students_by_subject[subject.id] = {
+            "subject_name": subject.name,
+            "student_count": len(student_ids),
+            "teacher_count": len(teacher_ids),
+            "class_count": len(subject_classes)
+        }
+    
+    subject_distribution = [
+        SubjectDistributionResponse(
+            subject_id=subj_id,
+            subject_name=data["subject_name"],
+            student_count=data["student_count"],
+            teacher_count=data["teacher_count"],
+            class_count=data["class_count"]
+        )
+        for subj_id, data in students_by_subject.items()
+    ]
+    
+    # ========== PARENT ANALYTICS ==========
+    
+    # Parents by children count
+    parents_by_children = {}
+    parent_student_relations = []
+    
+    for parent in parents:
+        parent_links = db.query(StudentParent).filter(StudentParent.parent_id == parent.id).all()
+        
+        # Get children details (only active students)
+        children = []
+        for link in parent_links:
+            student = db.query(User).filter(
+                User.id == link.student_id,
+                User.is_active == True
+            ).first()
+            if student:
+                children.append({
+                    "id": student.id,
+                    "name": student.name,
+                    "email": student.email,
+                    "grade": student.grade
+                })
+        
+        # Only count active children
+        children_count = len(children)
+        
+        # Only include parents with active children in the count
+        if children_count == 0:
+            continue  # Skip parents whose children are all deleted
+        
+        if children_count not in parents_by_children:
+            parents_by_children[children_count] = 0
+        parents_by_children[children_count] += 1
+        
+        parent_student_relations.append(ParentStudentRelationResponse(
+            parent_id=parent.id,
+            parent_name=parent.name,
+            parent_email=parent.email,
+            children_count=children_count,
+            children=children
+        ))
+    
+    parents_by_children_list = [{"children_count": k, "parent_count": v} for k, v in sorted(parents_by_children.items())]
+    
+    # ========== LINKED/UNLINKED STUDENTS ==========
+    
+    linked_student_ids = set()
+    for link in db.query(StudentParent).all():
+        student = db.query(User).filter(
+            User.id == link.student_id,
+            User.school_id == school_id,
+            User.is_active == True
+        ).first()
+        if student:
+            linked_student_ids.add(link.student_id)
+    
+    linked_students = len(linked_student_ids)
+    unlinked_students = len(students) - linked_students
+    
+    return AnalyticsResponse(
+        teacher_workload=teacher_workload,
+        teachers_by_subject=teachers_by_subject_list,
+        students_by_grade=grade_distribution,
+        students_by_subject=subject_distribution,
+        parents_by_children_count=parents_by_children_list,
+        parent_student_relations=parent_student_relations,
+        total_teachers=len(teachers),
+        total_students=len(students),
+        total_parents=len(parents),
+        total_classes=len(classes),
+        total_subjects=len(subjects),
+        linked_students=linked_students,
+        unlinked_students=unlinked_students
     )

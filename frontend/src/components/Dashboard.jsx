@@ -22,6 +22,7 @@ import TimetableManagement from './admin/TimetableManagement';
 import HolidaysEvents from './admin/HolidaysEvents';
 import Announcements from './admin/Announcements';
 import LessonsView from './admin/LessonsView';
+import Analytics from './admin/Analytics';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -42,6 +43,7 @@ const Dashboard = () => {
             <Route path="/holidays-events" element={<HolidaysEvents />} />
             <Route path="/announcements" element={<Announcements />} />
             <Route path="/lessons" element={<LessonsView />} />
+            <Route path="/analytics" element={<Analytics />} />
           </>
         ) : (
           // Super Admin Routes

@@ -42,6 +42,7 @@ class User(Base):
     school_id = Column(Integer, ForeignKey("schools.id"), nullable=True, index=True)
     is_active = Column(Boolean, default=True, nullable=False)
     subject = Column(String(255), nullable=True)  # Subject for teachers (nullable for other roles)
+    grade = Column(String(50), nullable=True)  # Grade for students (nullable for other roles)
     
     # Relationships
     school = relationship("School", back_populates="users")

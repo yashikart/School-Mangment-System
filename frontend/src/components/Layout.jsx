@@ -21,19 +21,20 @@ const Layout = ({ children }) => {
         { id: 'create-admin', label: 'Create Admin', icon: '➕', path: '/dashboard/create-admin' },
         { id: 'users', label: 'All Users', icon: '👤', path: '/dashboard/users' },
       ];
-    } else if (role === 'ADMIN') {
-      return [
-        { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
-        { id: 'teachers', label: 'Teachers', icon: '👨‍🏫', path: '/dashboard/teachers' },
-        { id: 'students', label: 'Students', icon: '👨‍🎓', path: '/dashboard/students' },
-        { id: 'parents', label: 'Parents', icon: '👨‍👩‍👧', path: '/dashboard/parents' },
-        { id: 'classes', label: 'Classes', icon: '📚', path: '/dashboard/classes' },
-        { id: 'timetable', label: 'Timetable', icon: '📅', path: '/dashboard/timetable' },
-        { id: 'lessons', label: 'Lessons', icon: '📖', path: '/dashboard/lessons' },
-        { id: 'holidays-events', label: 'Holidays & Events', icon: '🎉', path: '/dashboard/holidays-events' },
-        { id: 'announcements', label: 'Announcements', icon: '📢', path: '/dashboard/announcements' },
-      ];
-    } else if (role === 'TEACHER') {
+        } else if (role === 'ADMIN') {
+          return [
+            { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
+            { id: 'analytics', label: 'Analytics', icon: '📈', path: '/dashboard/analytics' },
+            { id: 'teachers', label: 'Teachers', icon: '👨‍🏫', path: '/dashboard/teachers' },
+            { id: 'students', label: 'Students', icon: '👨‍🎓', path: '/dashboard/students' },
+            { id: 'parents', label: 'Parents', icon: '👨‍👩‍👧', path: '/dashboard/parents' },
+            { id: 'classes', label: 'Classes', icon: '📚', path: '/dashboard/classes' },
+            { id: 'timetable', label: 'Timetable', icon: '📅', path: '/dashboard/timetable' },
+            { id: 'lessons', label: 'Lessons', icon: '📖', path: '/dashboard/lessons' },
+            { id: 'holidays-events', label: 'Holidays & Events', icon: '🎉', path: '/dashboard/holidays-events' },
+            { id: 'announcements', label: 'Announcements', icon: '📢', path: '/dashboard/announcements' },
+          ];
+        } else if (role === 'TEACHER') {
       return [
         { id: 'dashboard', label: 'Dashboard', icon: '📊', path: '/dashboard' },
         { id: 'classes', label: 'My Classes', icon: '📚', path: '/dashboard/classes' },
