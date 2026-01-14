@@ -360,4 +360,55 @@ export const schoolAdminAPI = {
   },
 };
 
+// Teacher API
+export const teacherAPI = {
+  // Dashboard Stats
+  getDashboardStats: async () => {
+    const response = await api.get('/teacher/dashboard/stats');
+    return response.data;
+  },
+  
+  // Classes
+  getMyClasses: async () => {
+    const response = await api.get('/teacher/classes');
+    return response.data;
+  },
+  getClassStudents: async (classId) => {
+    const response = await api.get(`/teacher/classes/${classId}/students`);
+    return response.data;
+  },
+  
+  // Lessons
+  getMyLessons: async (classId = null) => {
+    const params = {};
+    if (classId) params.class_id = classId;
+    const response = await api.get('/teacher/lessons', { params });
+    return response.data;
+  },
+  
+  // Timetable
+  getMyTimetable: async () => {
+    const response = await api.get('/teacher/timetable');
+    return response.data;
+  },
+  
+  // Announcements
+  getMyAnnouncements: async () => {
+    const response = await api.get('/teacher/announcements');
+    return response.data;
+  },
+  
+  // Attendance
+  getAttendance: async (classId, attendanceDate = null) => {
+    const params = { class_id: classId };
+    if (attendanceDate) params.attendance_date = attendanceDate;
+    const response = await api.get('/teacher/attendance', { params });
+    return response.data;
+  },
+  markAttendance: async (attendanceData) => {
+    const response = await api.post('/teacher/attendance/mark', attendanceData);
+    return response.data;
+  },
+};
+
 export default api;

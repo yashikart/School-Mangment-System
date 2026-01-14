@@ -229,3 +229,23 @@ class Announcement(Base):
     # Relationships
     school = relationship("School")
     creator = relationship("User", foreign_keys=[created_by])
+
+
+class Attendance(Base):
+    __tablename__ = "attendance"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    class_id = Column(Integer, ForeignKey("classes.id"), nullable=False, index=True)
+    teacher_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    school_id = Column(Integer, ForeignKey("schools.id"), nullable=False, index=True)
+    attendance_date = Column(Date, nullable=False, index=True)
+    status = Column(String(20), nullable=False, index=True)  # "PRESENT", "ABSENT", "LATE", "EXCUSED"
+    remarks = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    student = relationship("User", foreign_keys=[student_id])
+    class_obj = relationship("Class")
+    teacher = relationship("User", foreign_keys=[teacher_id])
+    school = relationship("School")

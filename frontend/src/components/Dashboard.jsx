@@ -24,9 +24,16 @@ import Announcements from './admin/Announcements';
 import LessonsView from './admin/LessonsView';
 import Analytics from './admin/Analytics';
 
+// Teacher Components
+import TeacherDashboard from './teacher/TeacherDashboard';
+import MyClasses from './teacher/MyClasses';
+import MyStudents from './teacher/MyStudents';
+import Attendance from './teacher/Attendance';
+
 const Dashboard = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  const isTeacher = user?.role === 'TEACHER';
 
   return (
     <Layout>
@@ -44,6 +51,15 @@ const Dashboard = () => {
             <Route path="/announcements" element={<Announcements />} />
             <Route path="/lessons" element={<LessonsView />} />
             <Route path="/analytics" element={<Analytics />} />
+          </>
+        ) : isTeacher ? (
+          // Teacher Routes
+          <>
+            <Route index element={<TeacherDashboard />} />
+            <Route path="/classes" element={<MyClasses />} />
+            <Route path="/classes/:classId/students" element={<MyStudents />} />
+            <Route path="/students" element={<MyStudents />} />
+            <Route path="/attendance" element={<Attendance />} />
           </>
         ) : (
           // Super Admin Routes

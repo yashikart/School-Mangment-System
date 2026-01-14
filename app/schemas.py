@@ -437,16 +437,42 @@ class AnalyticsResponse(BaseModel):
     # Student Analytics
     students_by_grade: List[GradeDistributionResponse] = []
     students_by_subject: List[SubjectDistributionResponse] = []
+
+
+# ==================== ATTENDANCE SCHEMAS ====================
+
+class AttendanceRecord(BaseModel):
+    student_id: int
+    status: str  # "PRESENT", "ABSENT", "LATE", "EXCUSED"
+    remarks: Optional[str] = None
+
+
+class AttendanceCreate(BaseModel):
+    student_id: int
+    class_id: int
+    attendance_date: date
+    status: str  # "PRESENT", "ABSENT", "LATE", "EXCUSED"
+    remarks: Optional[str] = None
+
+
+class AttendanceBulkCreate(BaseModel):
+    class_id: int
+    attendance_date: date
+    attendance_records: List[AttendanceRecord]
+
+
+class AttendanceResponse(BaseModel):
+    id: int
+    student_id: int
+    class_id: int
+    teacher_id: int
+    school_id: int
+    attendance_date: date
+    status: str
+    remarks: Optional[str] = None
+    created_at: datetime
+    student_name: Optional[str] = None
+    class_name: Optional[str] = None
     
-    # Parent Analytics
-    parents_by_children_count: List[dict] = []
-    parent_student_relations: List[ParentStudentRelationResponse] = []
-    
-    # Overall Stats
-    total_teachers: int
-    total_students: int
-    total_parents: int
-    total_classes: int
-    total_subjects: int
-    linked_students: int
-    unlinked_students: int
+    class Config:
+        from_attributes = True

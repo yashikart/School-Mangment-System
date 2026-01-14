@@ -93,7 +93,9 @@ const TimetableManagement = () => {
       alert('Timetable slot created successfully!');
     } catch (err) {
       console.error('Error creating timetable slot:', err);
-      alert(err.response?.data?.detail || 'Failed to create timetable slot');
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to create timetable slot';
+      console.error('Error details:', err.response?.data);
+      alert(`Error: ${errorMessage}`);
     }
   };
 

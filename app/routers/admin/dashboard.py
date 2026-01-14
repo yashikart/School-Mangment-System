@@ -1148,7 +1148,21 @@ def get_timetable(
         query = query.filter(TimetableSlot.class_id == class_id)
     
     slots = query.all()
-    return slots
+    # Convert time objects to strings for the response
+    return [
+        TimetableSlotResponse(
+            id=slot.id,
+            class_id=slot.class_id,
+            subject_id=slot.subject_id,
+            teacher_id=slot.teacher_id,
+            school_id=slot.school_id,
+            day_of_week=slot.day_of_week,
+            start_time=slot.start_time.strftime("%H:%M") if slot.start_time else "",
+            end_time=slot.end_time.strftime("%H:%M") if slot.end_time else "",
+            room=slot.room
+        )
+        for slot in slots
+    ]
 
 
 @router.post("/timetable", response_model=TimetableSlotResponse, status_code=status.HTTP_201_CREATED)
@@ -1158,55 +1172,123 @@ def create_timetable_slot(
     current_user: User = Depends(get_current_admin)
 ):
     """Create a timetable slot."""
-    school_id = current_user.school_id
-    
-    # Parse time strings
-    start_time_obj = datetime.strptime(slot_data.start_time, "%H:%M").time()
-    end_time_obj = datetime.strptime(slot_data.end_time, "%H:%M").time()
-    
-    # Check for conflicts (same teacher, same day, overlapping time)
-    conflicting = db.query(TimetableSlot).filter(
-        TimetableSlot.school_id == school_id,
-        TimetableSlot.teacher_id == slot_data.teacher_id,
-        TimetableSlot.day_of_week == slot_data.day_of_week,
-        or_(
-            and_(TimetableSlot.start_time <= start_time_obj, TimetableSlot.end_time > start_time_obj),
-            and_(TimetableSlot.start_time < end_time_obj, TimetableSlot.end_time >= end_time_obj),
-            and_(TimetableSlot.start_time >= start_time_obj, TimetableSlot.end_time <= end_time_obj)
+    try:
+        school_id = current_user.school_id
+        
+        # Log the incoming data for debugging
+        print(f"Creating timetable slot: class_id={slot_data.class_id}, subject_id={slot_data.subject_id}, teacher_id={slot_data.teacher_id}, day_of_week={slot_data.day_of_week}, start_time={slot_data.start_time}, end_time={slot_data.end_time}, room={slot_data.room}")
+        
+        # Validate required fields
+        if not slot_data.start_time or not slot_data.end_time:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="start_time and end_time are required"
+            )
+        
+        # Parse time strings
+        try:
+            start_time_obj = datetime.strptime(slot_data.start_time, "%H:%M").time()
+            end_time_obj = datetime.strptime(slot_data.end_time, "%H:%M").time()
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid time format. Use HH:MM format (e.g., 09:00, 14:30). Error: {str(e)}"
+            )
+        
+        # Validate that end_time is after start_time
+        if end_time_obj <= start_time_obj:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="end_time must be after start_time"
+            )
+        
+        # Verify class, subject, and teacher belong to this school
+        class_obj = db.query(Class).filter(
+            Class.id == slot_data.class_id,
+            Class.school_id == school_id
+        ).first()
+        if not class_obj:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Class not found or does not belong to this school"
+            )
+        
+        subject_obj = db.query(Subject).filter(
+            Subject.id == slot_data.subject_id,
+            Subject.school_id == school_id
+        ).first()
+        if not subject_obj:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Subject not found or does not belong to this school"
+            )
+        
+        teacher_obj = db.query(User).filter(
+            User.id == slot_data.teacher_id,
+            User.school_id == school_id,
+            User.role == UserRole.TEACHER
+        ).first()
+        if not teacher_obj:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Teacher not found or does not belong to this school"
+            )
+        
+        # Check for conflicts (same teacher, same day, overlapping time)
+        conflicting = db.query(TimetableSlot).filter(
+            TimetableSlot.school_id == school_id,
+            TimetableSlot.teacher_id == slot_data.teacher_id,
+            TimetableSlot.day_of_week == slot_data.day_of_week,
+            or_(
+                and_(TimetableSlot.start_time <= start_time_obj, TimetableSlot.end_time > start_time_obj),
+                and_(TimetableSlot.start_time < end_time_obj, TimetableSlot.end_time >= end_time_obj),
+                and_(TimetableSlot.start_time >= start_time_obj, TimetableSlot.end_time <= end_time_obj)
+            )
+        ).first()
+        
+        if conflicting:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Teacher has a conflicting schedule at this time"
+            )
+        
+        slot = TimetableSlot(
+            class_id=slot_data.class_id,
+            subject_id=slot_data.subject_id,
+            teacher_id=slot_data.teacher_id,
+            school_id=school_id,
+            day_of_week=slot_data.day_of_week,
+            start_time=start_time_obj,
+            end_time=end_time_obj,
+            room=slot_data.room
         )
-    ).first()
-    
-    if conflicting:
+        
+        db.add(slot)
+        db.commit()
+        db.refresh(slot)
+        
+        return TimetableSlotResponse(
+            id=slot.id,
+            class_id=slot.class_id,
+            subject_id=slot.subject_id,
+            teacher_id=slot.teacher_id,
+            school_id=slot.school_id,
+            day_of_week=slot.day_of_week,
+            start_time=slot.start_time.strftime("%H:%M"),
+            end_time=slot.end_time.strftime("%H:%M"),
+            room=slot.room
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error creating timetable slot: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Teacher has a conflicting schedule at this time"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating timetable slot: {str(e)}"
         )
-    
-    slot = TimetableSlot(
-        class_id=slot_data.class_id,
-        subject_id=slot_data.subject_id,
-        teacher_id=slot_data.teacher_id,
-        school_id=school_id,
-        day_of_week=slot_data.day_of_week,
-        start_time=start_time_obj,
-        end_time=end_time_obj,
-        room=slot_data.room
-    )
-    
-    db.add(slot)
-    db.commit()
-    db.refresh(slot)
-    
-    return TimetableSlotResponse(
-        id=slot.id,
-        class_id=slot.class_id,
-        subject_id=slot.subject_id,
-        teacher_id=slot.teacher_id,
-        day_of_week=slot.day_of_week,
-        start_time=slot.start_time.strftime("%H:%M"),
-        end_time=slot.end_time.strftime("%H:%M"),
-        room=slot.room
-    )
 
 
 # ==================== HOLIDAYS & EVENTS ====================

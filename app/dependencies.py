@@ -70,3 +70,20 @@ async def get_current_admin(
             detail="School Admin must be assigned to a school."
         )
     return current_user
+
+
+async def get_current_teacher(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Verify that the current user is a TEACHER."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions. Teacher access required."
+        )
+    if not current_user.school_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Teacher must be assigned to a school."
+        )
+    return current_user
